@@ -80,6 +80,8 @@ def _setup_workbench(scene: bpy.types.Scene) -> None:
     scene.render.film_transparent = False
     scene.render.image_settings.file_format = "PNG"
     scene.render.image_settings.color_mode = "RGB"
+    scene.render.image_settings.color_depth = "8"
+    scene.render.image_settings.compression = 100
     scene.view_settings.view_transform = "Standard"
     scene.display.render_aa = "8"
     shading = scene.display.shading
@@ -111,8 +113,6 @@ def _combine_side_by_side(views: list[Path], path: Path) -> None:
     combined = np.concatenate(rows, axis=1)
     out = bpy.data.images.new(path.stem, width * len(images), height)
     out.pixels.foreach_set(combined.ravel())
-    out.filepath_raw = str(path)
-    out.file_format = "PNG"
-    out.save()
+    out.save_render(str(path), scene=bpy.context.scene)  # uses scene PNG settings
     for img in images + [out]:
         bpy.data.images.remove(img)

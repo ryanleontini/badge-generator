@@ -28,23 +28,33 @@ badge-generator/
     __init__.py
     config.py             # load + validate TOML, defaults, dataclass
     scene.py              # reset scene, units, collections
-    base.py               # disc, edge chamfer/dome
-    ring.py               # raised outer ring
+    compat.py             # Blender version checks, STL exporter branch
+    mesh.py               # bmesh helpers: revolve profile, extrude, object I/O
+    base.py               # disc + edge + ring + recess as one lathe profile
+    ring.py               # ring section of the base profile
     emblem.py             # SVG import / text mode -> fitted, extruded mesh
-    mounting.py           # tape recess, pin/clip geometry
-    booleans.py           # union/difference helpers, cleanup
+    mounting.py           # tape recess profile, pin geometry
+    booleans.py           # union/difference helpers, cleanup, manifold check
     export.py             # STL export, preview render
+    pipeline.py           # build orchestration + summary report
   configs/
     front.toml
     rear.toml
     example_text.toml
-  tests/fixtures/
-    star.svg              # original simple shape
-    ring_with_hole.svg    # tests holes/counters in paths
-    multi_path.svg        # tests multiple separate paths
+  tests/
+    run_tests.py          # unittest runner inside Blender
+    test_config.py        # pure-Python config tests
+    test_geometry.py      # builds badges in Blender, inspects exported STLs
+    stl_check.py          # independent binary-STL checker (watertight, size, volume)
+    fixtures/
+      star.svg              # original simple shape
+      ring_with_hole.svg    # tests holes/counters in paths
+      multi_path.svg        # tests multiple separate paths
+  docs/images/            # README screenshots (make docs)
   out/                    # generated files (gitignored)
   README.md
-  Makefile                # make front / make rear / make test
+  LICENSE                 # MIT
+  Makefile                # make all / front / rear / text / test / check / docs
 ```
 
 ## Configuration (TOML)
@@ -102,10 +112,10 @@ out_dir = "out"
 - Create collections: `Base`, `Emblem`, `Mounting`.
 
 ### 2. Base disc (`base.py`)
-- Cylinder with `segments` verts, radius = diameter/2, depth = base_thickness, bottom face at Z=0.
-- Edge treatment on the top outer edge:
-  - `chamfer`: bevel via bmesh on the top rim edge loop.
-  - `dome`: scale inner top vertices upward in a smooth falloff (or build from a lathe profile). Keep the bottom perfectly flat.
+- Built as ONE revolved (r, z) profile with `segments` verts per ring, radius = diameter/2, bottom face at Z=0 (see `mesh.revolve`).
+- Edge treatment:
+  - `chamfer`: a 45° step in the profile at the rim's outer top edge.
+  - `dome`: the field (inside the ring, or the whole top without a ring) rises as a paraboloid to `edge_size` at the center. The bottom stays perfectly flat.
 - Prefer building geometry with bmesh over `bpy.ops` where practical (more reliable headless, no context issues).
 
 ### 3. Ring (`ring.py`)
@@ -119,22 +129,22 @@ SVG mode:
 - Record existing objects, run `bpy.ops.import_curve.svg(filepath=...)`, diff to find new curve objects.
 - Join all imported curves into one curve object.
 - Set `curve.dimensions = '2D'`, `fill_mode = 'BOTH'` so holes (counters) are respected.
-- Normalize: compute the bounding box, center at origin, uniformly scale so the larger dimension fits `inner_ring_diameter - 2*margin`. SVG import units are unreliable (DPI assumptions), so always fit by bounding box, never trust raw scale.
+- Tessellate the filled curve to a flat mesh (via depsgraph), then normalize: center the bounding box at the origin and uniformly scale so the farthest vertex lies on a circle of radius `ring_inner_radius - margin - |offset|` (bounding circle, not box, so rotation can never hit the ring). SVG import units are unreliable (DPI assumptions), so never trust raw scale.
 - Apply rotation and offsets.
-- Set `extrude` so total height = relief (+ 0.05 mm overlap into the base), move so bottom sits just below base top face.
-- Convert to mesh, apply transforms.
+- Extrude with bmesh from 0.05 mm below the base top face to `relief` above the field's highest point.
 
 Text mode:
 - Create a text object with the given string/font, same fit-to-circle logic, extrude, convert to mesh.
 
 ### 5. Mounting (`mounting.py`)
-- `tape`: boolean-difference a cylinder from the bottom face, radius = disc radius - recess_margin, depth = recess_depth.
+- `tape`: a step in the base's lathe profile (no boolean), radius = disc radius - recess_margin, depth = recess_depth.
 - `pins`: union small cylinders on the bottom at `pin_positions`, optional small chamfer at tips.
 - `none`: skip.
 
 ### 6. Booleans and cleanup (`booleans.py`)
-- Union base/ring body + pins, difference the tape recess.
-- Emblem kept separate if `split_bodies`; also produce a merged copy if `single_body`.
+- Union pins into the base/ring body.
+- Full body = base UNION emblem. Split emblem = emblem DIFFERENCE base, so split parts touch without overlapping.
+- Modifiers are applied via `bpy.data.meshes.new_from_object(evaluated)` rather than `bpy.ops`, avoiding context issues headless.
 - Solver: use `MANIFOLD` if available (Blender 4.5+), otherwise `EXACT`. Detect via enum items on the modifier.
 - Apply modifiers, then cleanup: merge by distance (0.001 mm), recalc normals outward, delete loose geometry.
 - Manifold check: use bmesh to count non-manifold edges; log the result and fail the run (non-zero exit) if any exist.
