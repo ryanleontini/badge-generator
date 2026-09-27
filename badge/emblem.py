@@ -151,7 +151,8 @@ def _tessellate(curve_obj: bpy.types.Object) -> bmesh.types.BMesh:
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
     if not bm.faces:
         bm.free()
-        raise EmblemError("emblem has no filled area; SVG paths must be closed shapes")
+        raise EmblemError("emblem has no filled area: SVG paths must be closed shapes and "
+                          "text must contain glyphs the font can draw")
     bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-6)
     for v in bm.verts:
         v.co.z = 0.0

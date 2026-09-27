@@ -126,6 +126,44 @@ class GeometryTests(unittest.TestCase):
         with self.assertRaisesRegex(EmblemError, "closed"):
             self.build(emblem={"mode": "svg", "svg_path": str(path)})
 
+    # --- Milestone 4: text emblems ------------------------------------------
+
+    def text(self, text: str, **emblem):
+        return self.build(emblem={"mode": "text", "text": text, **emblem},
+                          mounting={"style": "none"})
+
+    def test_text_builds_with_counters(self):
+        # "R" has one enclosed counter and "B" two: 2 solids with 3 through-holes.
+        cfg, build = self.text("RB")
+        for label in ("full", "base", "emblem"):
+            self.assertPrintable(build.outputs[label])
+        self.assertEqual(islands(build.emblem), 2)
+        self.assertEqual(genus(build.emblem), 3)
+        self.assertLessEqual(build.emblem_extent, cfg.emblem_max_radius + 1e-3)
+
+    def test_text_with_custom_font(self):
+        font = Path(bpy.utils.system_resource("DATAFILES", path="fonts")) / "DejaVuSansMono.woff2"
+        if not font.is_file():
+            self.skipTest("bundled DejaVuSansMono font not found")
+        _, default = self.text("A8")
+        default_volume = read_stl(default.outputs["emblem"]).volume
+        _, custom = self.text("A8", font_path=str(font))
+        info = self.assertPrintable(custom.outputs["emblem"])
+        self.assertEqual(genus(custom.emblem), 3)  # A: 1 counter, 8: 2 counters
+        self.assertNotAlmostEqual(info.volume, default_volume, delta=1.0)
+
+    def test_multiline_text(self):
+        cfg, build = self.text("R\nB")
+        self.assertPrintable(build.outputs["emblem"])
+        self.assertLessEqual(build.emblem_extent, cfg.emblem_max_radius + 1e-3)
+
+
+def genus(obj) -> int:
+    """Total number of through-holes across all closed components (Euler characteristic)."""
+    mesh = obj.data
+    chi = len(mesh.vertices) - len(mesh.edges) + len(mesh.polygons)
+    return (2 * islands(obj) - chi) // 2
+
 
 def islands(obj) -> int:
     """Number of connected mesh components."""
