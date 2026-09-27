@@ -157,6 +157,35 @@ class GeometryTests(unittest.TestCase):
         self.assertPrintable(build.outputs["emblem"])
         self.assertLessEqual(build.emblem_extent, cfg.emblem_max_radius + 1e-3)
 
+    # --- Milestone 5: mounting ----------------------------------------------
+
+    def test_tape_recess(self):
+        _, flat = self.build(mounting={"style": "none"})
+        flat_volume = read_stl(flat.outputs["full"]).volume  # read before it's overwritten
+        cfg, taped = self.build(mounting={"style": "tape", "recess_depth": 0.6,
+                                          "recess_margin": 2.0})
+        info = self.assertPrintable(taped.outputs["full"])
+        self.assertAlmostEqual(info.min[2], 0.0, delta=1e-4)  # outer rim still sits on Z=0
+        recess_r = cfg.radius - 2.0
+        removed = flat_volume - info.volume
+        expected = math.pi * recess_r ** 2 * 0.6
+        self.assertAlmostEqual(removed, expected, delta=expected * 0.002)
+
+    def test_pins(self):
+        positions = [[-20.0, 0.0], [20.0, 0.0], [0.0, 30.0]]
+        cfg, build = self.build(mounting={"style": "pins", "pin_diameter": 3.0,
+                                          "pin_length": 6.0, "pin_positions": positions})
+        for label in ("full", "base"):
+            info = self.assertPrintable(build.outputs[label])
+            self.assertAlmostEqual(info.min[2], -6.0, delta=1e-4)
+            self.assertDiameter(info, cfg.badge.diameter)
+        self.assertEqual(islands(build.base), 1)  # pins fused to the base
+        self.assertEqual(len(bpy.data.objects), 3)  # pin cutters cleaned up
+
+    def test_pin_at_disc_edge(self):
+        cfg, build = self.build(mounting={"style": "pins", "pin_positions": [[36.0, 0.0]]})
+        self.assertDiameter(self.assertPrintable(build.outputs["full"]), cfg.badge.diameter)
+
 
 def genus(obj) -> int:
     """Total number of through-holes across all closed components (Euler characteristic)."""

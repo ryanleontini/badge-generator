@@ -6,7 +6,7 @@ from pathlib import Path
 
 import bpy
 
-from . import base, booleans, emblem, export, scene
+from . import base, booleans, emblem, export, mounting, scene
 from .config import BadgeConfig
 from .mesh import bounds, copy_object, triangle_count
 
@@ -29,7 +29,10 @@ class Build:
 def build_geometry(cfg: BadgeConfig) -> Build:
     """Reset the scene and build all bodies. Raises NonManifoldError on bad geometry."""
     collections = scene.prepare_scene()
-    body = base.build_base(cfg, collections["Base"])
+    body = base.build_base(cfg, collections["Base"], bottom=mounting.bottom_profile(cfg))
+    for pin in mounting.build_pins(cfg, collections["Mounting"]):
+        booleans.apply_boolean(body, pin, "UNION")
+        _delete(pin)
     booleans.cleanup(body)
 
     raw_emblem = emblem.build_emblem(cfg, collections["Emblem"])
@@ -49,6 +52,12 @@ def build_geometry(cfg: BadgeConfig) -> Build:
     build = Build(base=body, emblem=raw_emblem, full=full, emblem_extent=extent)
     booleans.require_manifold(*build.bodies)
     return build
+
+
+def _delete(obj: bpy.types.Object) -> None:
+    data = obj.data
+    bpy.data.objects.remove(obj)
+    bpy.data.meshes.remove(data)
 
 
 def export_outputs(cfg: BadgeConfig, build: Build) -> None:
