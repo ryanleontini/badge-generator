@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build a command-line tool that generates a 3D-printable, flat circular car badge in Blender from either an SVG file or a text string. Everything is parameter-driven so the same tool produces the front (grille) and rear (trunk) badges for a VW Jetta, sized to replace OEM emblems (part numbers 5C6853601 and 5C6853630, nominal ~130 mm front / ~100 mm rear per retailer listings, pending caliper measurement).
+Build a command-line tool that generates a 3D-printable, flat circular car badge in Blender from either an SVG file or a text string. Everything is parameter-driven so the same tool produces the front (grille) and rear (trunk) badges for a VW Jetta, sized to replace OEM emblems (part numbers 5C6853601 and 5C6853630, rear measured at 75 mm; front ~130 mm per retailer listings, unverified).
 
 The tool must run headless:
 
