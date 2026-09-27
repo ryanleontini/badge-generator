@@ -27,8 +27,8 @@ class ConfigTests(unittest.TestCase):
     def test_defaults_are_valid(self):
         cfg = load_config(None, ROOT)
         self.assertEqual(cfg.badge.diameter, 75.0)
-        self.assertAlmostEqual(cfg.ring_outer_radius, 37.2)
-        self.assertAlmostEqual(cfg.ring_inner_radius, 33.2)
+        self.assertAlmostEqual(cfg.ring_inner_radius, 33.5)
+        self.assertAlmostEqual(cfg.rim_height, 4.2)
 
     def test_shipped_configs_load(self):
         for path in sorted((ROOT / "configs").glob("*.toml")):
@@ -42,8 +42,8 @@ class ConfigTests(unittest.TestCase):
 
     def test_diameter_change_rescales_derived_dimensions(self):
         cfg = from_dict({"badge": {"diameter": 100.0}}, ROOT)
-        self.assertAlmostEqual(cfg.ring_inner_radius, 50 - 0.3 - 4.0)
-        self.assertAlmostEqual(cfg.emblem_max_radius, 50 - 0.3 - 4.0 - 3.0)
+        self.assertAlmostEqual(cfg.ring_inner_radius, 50 - 4.0)
+        self.assertAlmostEqual(cfg.emblem_max_radius, 50 - 4.0 - 3.0)
 
     def test_unknown_key_suggests_fix(self):
         self.assertError({"badge": {"diamter": 75.0}}, "did you mean 'diameter'")
@@ -79,8 +79,12 @@ class ConfigTests(unittest.TestCase):
     def test_ring_wider_than_disc(self):
         self.assertError({"ring": {"width": 40.0}}, "no inner opening")
 
-    def test_chamfer_thicker_than_base(self):
-        self.assertError({"badge": {"edge_size": 3.0}}, "edge_size")
+    def test_chamfer_taller_than_rim(self):
+        self.assertError({"badge": {"edge_size": 4.5}}, "rim height")
+        self.assertError({"badge": {"edge_size": 3.5}, "ring": {"enabled": False}}, "rim height")
+
+    def test_chamfer_and_bevel_must_leave_ring_top(self):
+        self.assertError({"badge": {"edge_size": 3.8}}, "flat ring top")
 
     def test_all_errors_reported_together(self):
         errors = errors_for({"badge": {"diameter": -1.0}, "emblem": {"relief": 0.0}})

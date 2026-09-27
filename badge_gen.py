@@ -65,7 +65,7 @@ def log_summary(cfg: config.BadgeConfig) -> None:
              b.diameter, b.base_thickness, b.edge_style, b.edge_size)
     if cfg.ring.enabled:
         log.info("ring: radius %.2f -> %.2f mm, height %.2f mm",
-                 cfg.ring_outer_radius, cfg.ring_inner_radius, cfg.ring.height)
+                 cfg.radius, cfg.ring_inner_radius, cfg.ring.height)
     source = cfg.emblem.text if cfg.emblem.mode == "text" else cfg.emblem.svg_path
     log.info("emblem: %s %r, fit radius %.2f mm, relief %.2f mm",
              cfg.emblem.mode, source, cfg.emblem_max_radius, cfg.emblem.relief)

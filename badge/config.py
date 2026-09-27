@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Any
 
 # Geometric constants shared by the geometry modules.
-RING_INSET = 0.3  # gap between the disc edge and the ring's outer edge
 OVERLAP = 0.05  # how far unioned parts sink into the base for clean booleans
 MIN_EMBLEM_RADIUS = 2.0  # smallest usable emblem area before we call it an error
 
@@ -111,12 +110,14 @@ class BadgeConfig:
         return self.badge.diameter / 2
 
     @property
-    def ring_outer_radius(self) -> float:
-        return self.radius - RING_INSET
+    def ring_inner_radius(self) -> float:
+        # The ring is flush with the disc edge; the edge bevel runs up to its top.
+        return self.radius - self.ring.width
 
     @property
-    def ring_inner_radius(self) -> float:
-        return self.ring_outer_radius - self.ring.width
+    def rim_height(self) -> float:
+        """Height of the outer wall + edge bevel: the ring top if enabled, else the base top."""
+        return self.badge.base_thickness + (self.ring.height if self.ring.enabled else 0.0)
 
     @property
     def emblem_area_radius(self) -> float:
@@ -200,9 +201,9 @@ def validate(cfg: BadgeConfig) -> list[str]:
             f"badge.edge_style must be one of {EDGE_STYLES}, got {b.edge_style!r}")
     require(16 <= b.segments <= 4096, "badge.segments must be between 16 and 4096")
     if b.edge_style == "chamfer":
-        require(0 < b.edge_size < b.base_thickness,
-                f"badge.edge_size ({b.edge_size}) must be > 0 and < base_thickness "
-                f"({b.base_thickness}) for a chamfer")
+        require(0 < b.edge_size < cfg.rim_height,
+                f"badge.edge_size ({b.edge_size}) must be > 0 and < the rim height "
+                f"({cfg.rim_height:.2f} mm) for a chamfer")
     elif b.edge_style == "dome":
         require(b.edge_size > 0, "badge.edge_size (dome rise) must be > 0")
     if b.edge_style != "flat":
@@ -217,6 +218,10 @@ def validate(cfg: BadgeConfig) -> list[str]:
                 f"{b.diameter} mm badge")
         require(0 <= r.inner_bevel < min(r.width, r.height),
                 "ring.inner_bevel must be >= 0 and smaller than ring width and height")
+        if b.edge_style != "flat":
+            require(b.edge_size + r.inner_bevel < r.width,
+                    f"badge.edge_size + ring.inner_bevel ({b.edge_size + r.inner_bevel:.2f}) "
+                    f"must be < ring.width ({r.width}) to leave a flat ring top")
 
     # [emblem]
     require(em.mode in EMBLEM_MODES,

@@ -109,9 +109,9 @@ out_dir = "out"
 - Prefer building geometry with bmesh over `bpy.ops` where practical (more reliable headless, no context issues).
 
 ### 3. Ring (`ring.py`)
-- Annulus: outer radius = disc radius minus a small inset (0.3 mm), inner radius = outer minus width.
-- Build as a lathe/spin of a 2D profile (rectangle with inner bevel) so it's manifold by construction.
-- Sits on the base top face; overlap 0.05 mm into the base so the union is clean.
+- Decided: the ring is flush with the disc's outer edge (matches OEM: flat back, no lip wrapping the edge, ring at the rim). The edge chamfer/dome runs from the outer wall up to the ring top as one continuous bevel, so there is no overhang or gap under the ring.
+- When the ring is enabled, build base + ring as ONE lathe/spin of a 2D profile: flat bottom -> outer wall -> edge chamfer -> ring top -> inner bevel -> base top face -> axis. Manifold by construction, no base/ring boolean. Inner radius = disc radius minus width.
+- When the ring is disabled, the edge treatment sits on the base's top outer edge as in step 2.
 
 ### 4. Emblem (`emblem.py`)
 SVG mode:
@@ -133,7 +133,7 @@ Text mode:
 - `none`: skip.
 
 ### 6. Booleans and cleanup (`booleans.py`)
-- Union base + ring (+ pins), difference the tape recess.
+- Union base/ring body + pins, difference the tape recess.
 - Emblem kept separate if `split_bodies`; also produce a merged copy if `single_body`.
 - Solver: use `MANIFOLD` if available (Blender 4.5+), otherwise `EXACT`. Detect via enum items on the modifier.
 - Apply modifiers, then cleanup: merge by distance (0.001 mm), recalc normals outward, delete loose geometry.
