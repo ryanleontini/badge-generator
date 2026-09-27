@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Original test fixture: separate shapes as separate elements (chevron, bar, dot). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="80mm" viewBox="0 0 100 80">
+  <path fill="#000" d="M 10 10 L 50 35 L 90 10 L 90 25 L 50 50 L 10 25 Z"/>
+  <rect fill="#000" x="15" y="58" width="50" height="12"/>
+  <circle fill="#000" cx="80" cy="64" r="8"/>
+</svg>

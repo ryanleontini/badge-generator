@@ -1,0 +1,39 @@
+# Front (grille) badge, replaces OEM 5C6853601. All dimensions in mm.
+# Diameter/thickness are nominal until the OEM badge is measured.
+
+[badge]
+name = "front"
+diameter = 75.0
+base_thickness = 3.0
+edge_style = "chamfer"      # "flat" | "chamfer" | "dome"
+edge_size = 0.8             # chamfer size or dome rise
+segments = 256              # circle resolution
+
+[ring]
+enabled = true
+width = 4.0
+height = 1.2                # above base top face
+inner_bevel = 0.4
+
+[emblem]
+mode = "svg"                # "svg" | "text"
+svg_path = "tests/fixtures/star.svg"   # TODO: swap for art/front.svg when artwork is ready
+relief = 1.2                # height above base top face
+margin = 3.0                # clearance from ring inner edge
+rotation_deg = 0.0
+offset_x = 0.0
+offset_y = 0.0
+
+[mounting]
+style = "tape"              # "tape" | "pins" | "none"
+recess_depth = 0.6          # VHB 5952 is ~1.1 mm; recess partially
+recess_margin = 2.0
+pin_diameter = 3.0          # placeholders until the OEM badge is measured
+pin_length = 6.0
+pin_positions = [[-20.0, 0.0], [20.0, 0.0]]
+
+[export]
+split_bodies = true         # base+ring and emblem as separate STLs
+single_body = true          # also export merged STL
+render_preview = true
+out_dir = "out"

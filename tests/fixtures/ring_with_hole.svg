@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Original test fixture: an annulus (one path, outer contour + inner hole). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="0 0 100 100">
+  <path fill="#000" fill-rule="evenodd"
+        d="M 5 50 A 45 45 0 1 0 95 50 A 45 45 0 1 0 5 50 Z
+           M 25 50 A 25 25 0 1 1 75 50 A 25 25 0 1 1 25 50 Z"/>
+</svg>

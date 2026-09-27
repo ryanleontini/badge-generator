@@ -1,0 +1,15 @@
+# Text/monogram emblem example. Unset keys fall back to defaults in badge/config.py.
+
+[badge]
+name = "example_text"
+edge_style = "dome"
+edge_size = 0.6
+
+[emblem]
+mode = "text"
+text = "RB"
+font_path = ""              # empty = Blender's built-in font
+relief = 1.0
+
+[mounting]
+style = "none"
