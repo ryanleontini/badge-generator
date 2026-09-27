@@ -1,9 +1,10 @@
 # Rear (trunk) badge, replaces OEM 5C6853630. All dimensions in mm.
-# Diameter/thickness are nominal until the OEM badge is measured.
+# Diameter from retailer listings (~100 mm); confirm with calipers. Thickness is a placeholder.
+# OEM part is held by 3M foam tape; reportedly also has three short locating posts.
 
 [badge]
 name = "rear"
-diameter = 75.0
+diameter = 100.0
 base_thickness = 3.0
 edge_style = "chamfer"
 edge_size = 0.8

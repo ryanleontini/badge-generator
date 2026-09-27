@@ -1,9 +1,10 @@
 # Front (grille) badge, replaces OEM 5C6853601. All dimensions in mm.
-# Diameter/thickness are nominal until the OEM badge is measured.
+# Diameter from retailer listings (~130 mm); confirm with calipers. Thickness is a placeholder.
+# OEM part twist-locks into the grille with plastic clips, so mounting is still undecided.
 
 [badge]
 name = "front"
-diameter = 75.0
+diameter = 130.0
 base_thickness = 3.0
 edge_style = "chamfer"      # "flat" | "chamfer" | "dome"
 edge_size = 0.8             # chamfer size or dome rise
