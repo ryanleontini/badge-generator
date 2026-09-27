@@ -67,6 +67,9 @@ def export_outputs(cfg: BadgeConfig, build: Build) -> None:
     if cfg.export.split_bodies:
         build.outputs["base"] = export.export_stl([build.base], out / f"{name}_base.stl")
         build.outputs["emblem"] = export.export_stl([build.emblem], out / f"{name}_emblem.stl")
+    if cfg.export.render_preview:
+        build.outputs["preview"] = export.render_preview(
+            [build.base, build.emblem], cfg.badge.diameter, out / f"{name}_preview.png")
 
 
 def log_report(cfg: BadgeConfig, build: Build) -> None:

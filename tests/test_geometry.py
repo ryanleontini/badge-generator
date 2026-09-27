@@ -5,6 +5,7 @@ Skipped automatically when run outside Blender (no ``bpy``).
 
 import itertools
 import math
+import struct
 import tempfile
 import unittest
 from pathlib import Path
@@ -185,6 +186,23 @@ class GeometryTests(unittest.TestCase):
     def test_pin_at_disc_edge(self):
         cfg, build = self.build(mounting={"style": "pins", "pin_positions": [[36.0, 0.0]]})
         self.assertDiameter(self.assertPrintable(build.outputs["full"]), cfg.badge.diameter)
+
+    # --- Milestone 6: split export + preview --------------------------------
+
+    def test_output_selection(self):
+        _, only_full = self.build(export={"split_bodies": False, "single_body": True})
+        self.assertEqual(set(only_full.outputs), {"full"})
+        _, only_split = self.build(export={"split_bodies": True, "single_body": False})
+        self.assertEqual(set(only_split.outputs), {"base", "emblem"})
+
+    def test_preview_is_two_views_side_by_side(self):
+        from badge.export import PREVIEW_SIZE
+        _, build = self.build(export={"render_preview": True})
+        png = build.outputs["preview"].read_bytes()
+        self.assertEqual(png[:8], b"\x89PNG\r\n\x1a\n")
+        width, height = struct.unpack(">II", png[16:24])
+        self.assertEqual((width, height), (2 * PREVIEW_SIZE, PREVIEW_SIZE))
+        self.assertEqual(sorted(p.name for p in self.out.glob("*.png")), ["badge_preview.png"])
 
 
 def genus(obj) -> int:
