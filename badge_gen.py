@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from badge import booleans, compat, config, pipeline  # noqa: E402
+from badge import booleans, compat, config, emblem, pipeline  # noqa: E402
 
 log = logging.getLogger("badge")
 
@@ -52,11 +52,11 @@ def run(args: argparse.Namespace) -> int:
     log.info("boolean solver: %s", booleans.solver())
     try:
         build = pipeline.build_geometry(cfg)
-    except booleans.NonManifoldError as exc:
+    except (booleans.NonManifoldError, emblem.EmblemError) as exc:
         log.error("%s", exc)
         return 1
     pipeline.export_outputs(cfg, build)
-    pipeline.log_report(build)
+    pipeline.log_report(cfg, build)
 
     log.info("done in %.2f s", time.perf_counter() - start)
     return 0

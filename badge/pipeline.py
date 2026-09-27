@@ -6,7 +6,7 @@ from pathlib import Path
 
 import bpy
 
-from . import base, booleans, export, scene
+from . import base, booleans, emblem, export, scene
 from .config import BadgeConfig
 from .mesh import bounds, copy_object, triangle_count
 
@@ -15,9 +15,15 @@ log = logging.getLogger("badge")
 
 @dataclass
 class Build:
-    base: bpy.types.Object
-    full: bpy.types.Object
+    base: bpy.types.Object  # base disc + ring (+ mounting features)
+    emblem: bpy.types.Object  # emblem trimmed to sit on the base without overlap
+    full: bpy.types.Object  # base and emblem unioned into one body
+    emblem_extent: float  # farthest emblem point from the center, mm
     outputs: dict[str, Path] = field(default_factory=dict)
+
+    @property
+    def bodies(self) -> list[bpy.types.Object]:
+        return [self.base, self.emblem, self.full]
 
 
 def build_geometry(cfg: BadgeConfig) -> Build:
@@ -25,9 +31,24 @@ def build_geometry(cfg: BadgeConfig) -> Build:
     collections = scene.prepare_scene()
     body = base.build_base(cfg, collections["Base"])
     booleans.cleanup(body)
+
+    raw_emblem = emblem.build_emblem(cfg, collections["Emblem"])
+    booleans.cleanup(raw_emblem)
+    extent = emblem.emblem_extent(raw_emblem)
+
+    # Single body: the emblem overlaps the base by OVERLAP so the union is clean.
     full = copy_object(body, f"{cfg.badge.name}_full", collections["Base"])
-    booleans.require_manifold(body, full)
-    return Build(base=body, full=full)
+    booleans.apply_boolean(full, raw_emblem, "UNION")
+    booleans.cleanup(full)
+
+    # Split bodies: trim the overlap so the two parts touch without intersecting,
+    # which keeps two-color slicing unambiguous.
+    booleans.apply_boolean(raw_emblem, body, "DIFFERENCE")
+    booleans.cleanup(raw_emblem)
+
+    build = Build(base=body, emblem=raw_emblem, full=full, emblem_extent=extent)
+    booleans.require_manifold(*build.bodies)
+    return build
 
 
 def export_outputs(cfg: BadgeConfig, build: Build) -> None:
@@ -36,14 +57,18 @@ def export_outputs(cfg: BadgeConfig, build: Build) -> None:
         build.outputs["full"] = export.export_stl([build.full], out / f"{name}_full.stl")
     if cfg.export.split_bodies:
         build.outputs["base"] = export.export_stl([build.base], out / f"{name}_base.stl")
+        build.outputs["emblem"] = export.export_stl([build.emblem], out / f"{name}_emblem.stl")
 
 
-def log_report(build: Build) -> None:
+def log_report(cfg: BadgeConfig, build: Build) -> None:
     lo, hi = bounds(build.full)
     size = [h - l for l, h in zip(lo, hi)]
     log.info("size: %.3f x %.3f x %.3f mm (X x Y x Z)", *size)
-    for obj in (build.base, build.full):
-        log.info("%-18s %7d triangles, %d non-manifold edges", obj.name,
+    bound = cfg.ring_inner_radius if cfg.ring.enabled else cfg.emblem_area_radius
+    log.info("emblem reaches r = %.2f mm; clearance to %s %.2f mm", build.emblem_extent,
+             "ring" if cfg.ring.enabled else "edge", bound - build.emblem_extent)
+    for obj in build.bodies:
+        log.info("%-20s %7d triangles, %d non-manifold edges", obj.name,
                  triangle_count(obj), booleans.non_manifold_edges(obj))
     for label, path in build.outputs.items():
-        log.info("wrote %-6s %s", label, path)
+        log.info("wrote %-7s %s", label, path)

@@ -76,6 +76,77 @@ class GeometryTests(unittest.TestCase):
         info = read_stl(build.outputs["base"])
         self.assertAlmostEqual(info.volume, expected, delta=expected * 0.001)
 
+    # --- Milestone 3: SVG emblems -------------------------------------------
+
+    def svg(self, name: str, **emblem):
+        return self.build(emblem={"mode": "svg", "svg_path": str(FIXTURES / name), **emblem},
+                          mounting={"style": "none"})
+
+    def test_all_fixtures_build_printable_bodies(self):
+        for name in ("star.svg", "ring_with_hole.svg", "multi_path.svg"):
+            with self.subTest(fixture=name):
+                cfg, build = self.svg(name)
+                for label in ("full", "base", "emblem"):
+                    self.assertPrintable(build.outputs[label])
+                self.assertDiameter(read_stl(build.outputs["full"]), cfg.badge.diameter)
+
+    def test_emblem_fits_inside_ring_at_any_rotation(self):
+        for rotation, offset in ((0.0, 0.0), (45.0, 0.0), (17.0, 4.0)):
+            with self.subTest(rotation=rotation, offset=offset):
+                cfg, build = self.svg("multi_path.svg", rotation_deg=rotation, offset_x=offset)
+                limit = cfg.ring_inner_radius - cfg.emblem.margin
+                self.assertLessEqual(build.emblem_extent, limit + 1e-3)
+                self.assertGreater(build.emblem_extent, limit - offset - 1e-3)
+
+    def test_hole_is_respected(self):
+        # Annulus fixture: outer r=45, inner r=25 in SVG units, so the fitted
+        # emblem's area is pi * (R^2 - (R * 25/45)^2) and volume = area * relief.
+        cfg, build = self.svg("ring_with_hole.svg")
+        outer = cfg.emblem_max_radius
+        area = math.pi * (outer ** 2 - (outer * 25 / 45) ** 2)
+        info = read_stl(build.outputs["emblem"])
+        self.assertAlmostEqual(info.volume, area * cfg.emblem.relief, delta=area * 0.01)
+
+    def test_separate_paths_stay_separate(self):
+        _, build = self.svg("multi_path.svg")
+        self.assertEqual(islands(build.emblem), 3)
+
+    def test_split_bodies_touch_but_do_not_overlap(self):
+        _, build = self.svg("star.svg")
+        vols = {k: read_stl(v).volume for k, v in build.outputs.items()}
+        self.assertAlmostEqual(vols["base"] + vols["emblem"], vols["full"],
+                               delta=vols["full"] * 1e-4)
+        self.assertAlmostEqual(read_stl(build.outputs["emblem"]).min[2], 3.0, delta=1e-4)
+
+    def test_svg_without_closed_paths_fails_clearly(self):
+        from badge.emblem import EmblemError
+        path = self.out / "open.svg"
+        path.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'
+                        '<path d="M 1 1 L 9 9" stroke="#000" fill="none"/></svg>')
+        with self.assertRaisesRegex(EmblemError, "closed"):
+            self.build(emblem={"mode": "svg", "svg_path": str(path)})
+
+
+def islands(obj) -> int:
+    """Number of connected mesh components."""
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    seen, count = set(), 0
+    for start in bm.verts:
+        if start.index in seen:
+            continue
+        count += 1
+        stack = [start]
+        while stack:
+            v = stack.pop()
+            if v.index in seen:
+                continue
+            seen.add(v.index)
+            stack.extend(e.other_vert(v) for e in v.link_edges)
+    bm.free()
+    return count
+
 
 if __name__ == "__main__":
     unittest.main()
