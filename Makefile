@@ -2,7 +2,7 @@
 BLENDER ?= blender
 RUN = $(BLENDER) --background --factory-startup --quiet --python-exit-code 1 --python
 
-.PHONY: front rear text test unit smoke clean
+.PHONY: front rear text test unit smoke check clean
 
 front:
 	$(RUN) badge_gen.py -- --config configs/front.toml
@@ -12,6 +12,7 @@ rear:
 
 text:
 	$(RUN) badge_gen.py -- --config configs/example_text.toml
+	$(RUN) tests/stl_check.py -- out/*.stl
 
 test: unit smoke
 
@@ -23,6 +24,10 @@ smoke:
 	$(RUN) badge_gen.py -- --config configs/front.toml
 	$(RUN) badge_gen.py -- --config configs/rear.toml
 	$(RUN) badge_gen.py -- --config configs/example_text.toml
+	$(RUN) tests/stl_check.py -- out/*.stl
+
+check:
+	$(RUN) tests/stl_check.py -- out/*.stl
 
 clean:
 	rm -rf out

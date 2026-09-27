@@ -124,9 +124,9 @@ class BadgeConfig:
         """Radius of the region the emblem may occupy, before margin/offset."""
         if self.ring.enabled:
             return self.ring_inner_radius
-        if self.badge.edge_style == "flat":
-            return self.radius
-        return self.radius - self.badge.edge_size
+        if self.badge.edge_style == "chamfer":
+            return self.radius - self.badge.edge_size
+        return self.radius
 
     @property
     def emblem_max_radius(self) -> float:
@@ -218,7 +218,7 @@ def validate(cfg: BadgeConfig) -> list[str]:
                 f"{b.diameter} mm badge")
         require(0 <= r.inner_bevel < min(r.width, r.height),
                 "ring.inner_bevel must be >= 0 and smaller than ring width and height")
-        if b.edge_style != "flat":
+        if b.edge_style == "chamfer":
             require(b.edge_size + r.inner_bevel < r.width,
                     f"badge.edge_size + ring.inner_bevel ({b.edge_size + r.inner_bevel:.2f}) "
                     f"must be < ring.width ({r.width}) to leave a flat ring top")

@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from badge import compat, config, scene  # noqa: E402
+from badge import booleans, compat, config, pipeline  # noqa: E402
 
 log = logging.getLogger("badge")
 
@@ -49,9 +49,14 @@ def run(args: argparse.Namespace) -> int:
         log.info("config OK (--check, nothing built)")
         return 0
 
-    collections = scene.prepare_scene()
-    log.info("scene ready: mm units, collections %s", ", ".join(collections))
-    log.info("geometry stages not implemented yet (milestone 2+)")
+    log.info("boolean solver: %s", booleans.solver())
+    try:
+        build = pipeline.build_geometry(cfg)
+    except booleans.NonManifoldError as exc:
+        log.error("%s", exc)
+        return 1
+    pipeline.export_outputs(cfg, build)
+    pipeline.log_report(build)
 
     log.info("done in %.2f s", time.perf_counter() - start)
     return 0
