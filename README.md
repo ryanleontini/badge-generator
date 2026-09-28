@@ -42,8 +42,23 @@ blender -b -P badge_gen.py -- --config configs/front.toml
 | `make all` | Build all three |
 | `make test` | Unit + geometry tests, then build every config and verify every STL |
 | `make check` | Verify the STLs already in `out/` |
+| `make web` | Open the local web UI |
 | `make docs` | Rebuild the README screenshots |
 | `make clean` | Delete `out/` |
+
+### Web UI
+
+```bash
+make web        # or: python3 web/server.py
+```
+
+This opens a local page at http://127.0.0.1:8000. You can:
+- start from any shipped config;
+- edit every parameter, with validation as you type (same rules as the CLI);
+- upload an SVG (it's saved into `art/`) or switch to text mode;
+- build, spin the result in a 3D viewer, and download the STLs, preview and a `.toml` config.
+
+The page can't launch Blender itself, so [web/server.py](web/server.py) does that for each build. It uses only Python's standard library and listens on localhost only. The 3D viewer loads three.js from a CDN. Offline, the rendered PNG preview still works.
 
 The `make` targets add `--factory-startup` so your Blender preferences and add-ons can't affect the result. Pass `--check` after `--` to validate a config without building anything. Add `-v` for debug logging.
 
@@ -138,6 +153,7 @@ mounting.py    tape recess profile, pin solids
 booleans.py    union/difference, cleanup, manifold check
 export.py      STL export, Workbench preview
 pipeline.py    orchestration; badge_gen.py is the CLI
+web/           local web UI: server.py (stdlib) + index.html
 ```
 
 Design decisions:

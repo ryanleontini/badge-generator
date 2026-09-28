@@ -81,7 +81,7 @@ def _setup_workbench(scene: bpy.types.Scene) -> None:
     scene.render.image_settings.file_format = "PNG"
     scene.render.image_settings.color_mode = "RGB"
     scene.render.image_settings.color_depth = "8"
-    scene.render.image_settings.compression = 100
+    scene.render.image_settings.compression = 75
     scene.view_settings.view_transform = "Standard"
     scene.display.render_aa = "8"
     shading = scene.display.shading

@@ -2,7 +2,7 @@
 BLENDER ?= blender
 RUN = $(BLENDER) --background --factory-startup --quiet --python-exit-code 1 --python
 
-.PHONY: all front rear text test unit smoke check docs clean
+.PHONY: all front rear text web test unit smoke check docs clean
 
 all: front rear text
 
@@ -14,6 +14,10 @@ rear:
 
 text:
 	$(RUN) badge_gen.py -- --config configs/example_text.toml
+
+# Local web UI at http://127.0.0.1:8000 (Python standard library only).
+web:
+	python3 web/server.py
 
 test: unit smoke
 

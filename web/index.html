@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Badge Generator</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --text: #1d2025; --muted: #6a717c; --border: #dde0e5;
+    --accent: #2f6fde; --accent-text: #ffffff; --error: #c62f2f; --error-bg: #fdecec;
+    --ok: #2a8a4a; --field: #ffffff; --code: #f0f1f4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15171a; --panel: #1e2125; --text: #e6e8eb; --muted: #969ca6; --border: #33373d;
+      --accent: #5b8ff0; --accent-text: #0d1117; --error: #ff7b7b; --error-bg: #3a1f1f;
+      --ok: #5fcf82; --field: #16181b; --code: #16181b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { padding: 18px 24px 6px; }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 2px 0 0; color: var(--muted); }
+  main { display: grid; grid-template-columns: 380px 1fr; gap: 20px; padding: 16px 24px 32px;
+         align-items: start; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 12px 16px 24px; } }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  #sections .panel { margin-top: 12px; }
+  input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+       margin: 0 0 10px; }
+  .row { display: grid; grid-template-columns: 1fr 130px; align-items: center; gap: 8px; margin: 7px 0; }
+  .row.wide { grid-template-columns: 1fr; }
+  .row label { color: var(--text); }
+  .row small { color: var(--muted); display: block; font-size: 12px; }
+  input, select, textarea { width: 100%; font: inherit; color: var(--text); background: var(--field);
+       border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
+  input[type=checkbox] { width: auto; justify-self: end; transform: scale(1.2); }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .unit { position: relative; }
+  .unit input { padding-right: 32px; }
+  .unit::after { content: attr(data-unit); position: absolute; right: 9px; top: 50%;
+       transform: translateY(-50%); color: var(--muted); font-size: 12px; pointer-events: none; }
+  .hidden { display: none !important; }
+  .actions { position: sticky; bottom: 0; margin-top: 12px; display: flex; gap: 8px;
+       background: var(--bg); padding: 10px 0; }
+  button { font: inherit; border-radius: 7px; padding: 9px 14px; cursor: pointer;
+       border: 1px solid var(--border); background: var(--panel); color: var(--text); }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent);
+       font-weight: 600; flex: 1; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .errors { background: var(--error-bg); color: var(--error); border-radius: 8px; padding: 8px 12px;
+       margin: 0 0 12px; }
+  .errors ul { margin: 4px 0; padding-left: 18px; }
+  .status { display: flex; align-items: center; gap: 10px; min-height: 24px; margin-bottom: 12px; }
+  .status.ok { color: var(--ok); }
+  .status.fail { color: var(--error); }
+  .spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent);
+       border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #viewer { width: 100%; aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden;
+       background: var(--code); position: relative; }
+  #viewer .hint { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted);
+       text-align: center; padding: 16px; }
+  #preview { width: 100%; border-radius: 8px; margin-top: 12px; display: block; }
+  .downloads { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  .downloads a { color: var(--accent); text-decoration: none; border: 1px solid var(--border);
+       border-radius: 6px; padding: 6px 10px; }
+  .downloads a:hover { border-color: var(--accent); }
+  details summary { cursor: pointer; color: var(--muted); }
+  pre { background: var(--code); border-radius: 6px; padding: 10px; overflow-x: auto; font-size: 12px;
+       white-space: pre-wrap; word-break: break-word; }
+  .file-name { color: var(--muted); font-size: 12px; word-break: break-all; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--border); border-radius: 7px;
+       overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 7px; }
+  .seg button[aria-pressed=true] { background: var(--accent); color: var(--accent-text); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Badge Generator</h1>
+  <p>Set the parameters, build, and download print-ready STLs. All dimensions in millimeters.</p>
+</header>
+<main>
+  <form id="form" autocomplete="off" onsubmit="return false">
+    <div class="panel">
+      <div class="row"><label for="preset">Start from</label><select id="preset"></select></div>
+    </div>
+    <div id="sections"></div>
+    <div class="actions">
+      <button type="button" class="primary" id="build">Build badge</button>
+      <button type="button" id="save" title="Download these settings as a config file">Save config</button>
+    </div>
+  </form>
+
+  <section>
+    <div id="errors" class="errors hidden"></div>
+    <div class="panel">
+      <div id="status" class="status">Ready. Adjust the settings and click Build.</div>
+      <div id="viewer"><div class="hint">The 3D model appears here after a build.<br>Drag to orbit, scroll to zoom.</div></div>
+      <div id="downloads" class="downloads hidden"></div>
+      <img id="preview" class="hidden" alt="Rendered preview: top view and 3/4 view">
+      <details id="log-wrap" class="hidden"><summary>Build log</summary><pre id="log"></pre></details>
+    </div>
+  </section>
+</main>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+</script>
+<script type="module">
+// ---- Form schema: mirrors badge/config.py ---------------------------------
+const num = (key, label, unit = "mm", extra = {}) => ({ key, label, type: "number", unit, ...extra });
+const SCHEMA = [
+  { section: "badge", title: "Badge", fields: [
+    { key: "name", label: "Name", type: "text", help: "Output file prefix" },
+    num("diameter", "Diameter", "mm", { step: 0.1 }),
+    num("base_thickness", "Base thickness", "mm", { step: 0.1 }),
+    { key: "edge_style", label: "Edge", type: "select", options: ["flat", "chamfer", "dome"] },
+    num("edge_size", "Chamfer size", "mm", { step: 0.1,
+        label: s => s.badge.edge_style === "dome" ? "Dome rise" : "Chamfer size",
+        show: s => s.badge.edge_style !== "flat" }),
+    num("segments", "Circle segments", "", { step: 1, help: "Higher = smoother circle" }),
+  ]},
+  { section: "ring", title: "Raised ring", fields: [
+    { key: "enabled", label: "Include ring", type: "checkbox" },
+    num("width", "Width", "mm", { step: 0.1, show: s => s.ring.enabled }),
+    num("height", "Height", "mm", { step: 0.1, show: s => s.ring.enabled }),
+    num("inner_bevel", "Inner bevel", "mm", { step: 0.1, show: s => s.ring.enabled }),
+  ]},
+  { section: "emblem", title: "Emblem", fields: [
+    { key: "mode", label: "Source", type: "segmented", options: [["svg", "SVG file"], ["text", "Text"]] },
+    { key: "svg_path", label: "SVG artwork", type: "file", show: s => s.emblem.mode === "svg",
+      help: "Filled, closed paths only; no background rectangle" },
+    { key: "text", label: "Text", type: "textarea", show: s => s.emblem.mode === "text",
+      help: "New line = second row" },
+    { key: "font_path", label: "Font file", type: "text", show: s => s.emblem.mode === "text",
+      help: "Path to .ttf/.otf; empty = built-in" },
+    num("relief", "Relief height", "mm", { step: 0.1 }),
+    num("margin", "Gap to ring", "mm", { step: 0.1 }),
+    num("rotation_deg", "Rotation", "°", { step: 1 }),
+    num("offset_x", "Offset X", "mm", { step: 0.5 }),
+    num("offset_y", "Offset Y", "mm", { step: 0.5 }),
+  ]},
+  { section: "mounting", title: "Mounting (back)", fields: [
+    { key: "style", label: "Style", type: "select", options: ["tape", "pins", "none"] },
+    num("recess_depth", "Tape recess depth", "mm", { step: 0.1, show: s => s.mounting.style === "tape" }),
+    num("recess_margin", "Recess rim width", "mm", { step: 0.1, show: s => s.mounting.style === "tape" }),
+    num("pin_diameter", "Pin diameter", "mm", { step: 0.1, show: s => s.mounting.style === "pins" }),
+    num("pin_length", "Pin length", "mm", { step: 0.1, show: s => s.mounting.style === "pins" }),
+    { key: "pin_positions", label: "Pin positions", type: "points", show: s => s.mounting.style === "pins",
+      help: "One \"x, y\" per line, mm from center" },
+  ]},
+];
+
+// ---- State ----------------------------------------------------------------
+const $ = id => document.getElementById(id);
+let presets = {}, state = null, validateTimer = null;
+
+async function api(path, body) {
+  const res = await fetch(path, body === undefined ? {} :
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  return res.json();
+}
+
+function configPayload() {
+  const { export: _ignored, ...rest } = state;
+  return rest;
+}
+
+// ---- Form rendering -------------------------------------------------------
+function renderForm() {
+  const root = $("sections");
+  root.innerHTML = "";
+  for (const group of SCHEMA) {
+    const panel = document.createElement("div");
+    panel.className = "panel";
+    panel.innerHTML = `<h2>${group.title}</h2>`;
+    for (const f of group.fields) panel.appendChild(fieldRow(group.section, f));
+    root.appendChild(panel);
+  }
+  refreshVisibility();
+}
+
+function fieldRow(section, f) {
+  const row = document.createElement("div");
+  const id = `${section}.${f.key}`;
+  const value = state[section][f.key];
+  row.className = "row" + (["textarea", "points", "file", "segmented"].includes(f.type) ? " wide" : "");
+  row.dataset.section = section; row.dataset.key = f.key;
+  const label = document.createElement("label");
+  label.htmlFor = id;
+  label.innerHTML = `<span class="lbl"></span>${f.help ? `<small>${f.help}</small>` : ""}`;
+  row.appendChild(label);
+  const set = v => { state[section][f.key] = v; refreshVisibility(); scheduleValidate(); };
+  let input;
+  switch (f.type) {
+    case "number": {
+      const wrap = document.createElement("div");
+      wrap.className = "unit"; wrap.dataset.unit = f.unit || "";
+      input = Object.assign(document.createElement("input"), { type: "number", id, step: f.step ?? "any", value });
+      input.addEventListener("input", () => {
+        const v = input.valueAsNumber;
+        set(Number.isNaN(v) ? input.value : (f.key === "segments" ? Math.round(v) : v));
+      });
+      wrap.appendChild(input); row.appendChild(wrap);
+      break;
+    }
+    case "text":
+      input = Object.assign(document.createElement("input"), { type: "text", id, value });
+      input.addEventListener("input", () => set(input.value));
+      row.appendChild(input); break;
+    case "textarea":
+      input = Object.assign(document.createElement("textarea"), { id, rows: 2, value });
+      input.addEventListener("input", () => set(input.value));
+      row.appendChild(input); break;
+    case "checkbox":
+      input = Object.assign(document.createElement("input"), { type: "checkbox", id, checked: value });
+      input.addEventListener("change", () => set(input.checked));
+      row.appendChild(input); break;
+    case "select":
+      input = document.createElement("select"); input.id = id;
+      for (const o of f.options) input.add(new Option(o, o, false, o === value));
+      input.addEventListener("change", () => set(input.value));
+      row.appendChild(input); break;
+    case "segmented": {
+      const seg = document.createElement("div"); seg.className = "seg"; seg.id = id;
+      for (const [v, text] of f.options) {
+        const b = Object.assign(document.createElement("button"), { type: "button", textContent: text });
+        b.setAttribute("aria-pressed", String(v === value));
+        b.addEventListener("click", () => {
+          seg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+          set(v);
+        });
+        seg.appendChild(b);
+      }
+      row.appendChild(seg); break;
+    }
+    case "points":
+      input = Object.assign(document.createElement("textarea"), { id, rows: 3,
+        value: (value || []).map(p => p.join(", ")).join("\n") });
+      input.addEventListener("input", () => set(parsePoints(input.value)));
+      row.appendChild(input); break;
+    case "file": {
+      input = Object.assign(document.createElement("input"), { type: "file", id, accept: ".svg,image/svg+xml" });
+      const name = Object.assign(document.createElement("div"), { className: "file-name" });
+      name.textContent = value ? `Using ${value}` : "No file chosen";
+      input.addEventListener("change", async () => {
+        const file = input.files[0];
+        if (!file) return;
+        name.textContent = "Uploading…";
+        const data = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(",")[1]);  // strip data: URL prefix
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+        const res = await api("/api/upload", { name: file.name, data });
+        if (res.svg_path) { name.textContent = `Using ${res.svg_path}`; set(res.svg_path); }
+        else { name.textContent = "Upload failed"; showErrors(res.errors || ["upload failed"]); }
+      });
+      row.append(input, name); break;
+    }
+  }
+  return row;
+}
+
+function parsePoints(text) {
+  return text.split("\n").map(l => l.trim()).filter(Boolean).map(line => {
+    const parts = line.split(/[\s,]+/).filter(Boolean).map(Number);
+    return parts.length === 2 && parts.every(Number.isFinite) ? parts : line;
+  });
+}
+
+function refreshVisibility() {
+  for (const group of SCHEMA) for (const f of group.fields) {
+    const row = document.querySelector(`.row[data-section="${group.section}"][data-key="${f.key}"]`);
+    if (!row) continue;
+    row.classList.toggle("hidden", f.show ? !f.show(state) : false);
+    row.querySelector(".lbl").textContent = typeof f.label === "function" ? f.label(state) : f.label;
+  }
+}
+
+// ---- Validation, build, results -------------------------------------------
+function showErrors(errors) {
+  const box = $("errors");
+  box.classList.toggle("hidden", !errors.length);
+  box.innerHTML = errors.length ? `<strong>Fix before building:</strong><ul>${
+    errors.map(e => `<li>${escapeHtml(e)}</li>`).join("")}</ul>` : "";
+  $("build").disabled = errors.length > 0;
+}
+
+function scheduleValidate() {
+  clearTimeout(validateTimer);
+  validateTimer = setTimeout(async () => showErrors((await api("/api/validate", { config: configPayload() })).errors), 250);
+}
+
+function setStatus(html, cls = "") {
+  const s = $("status");
+  s.className = "status " + cls;
+  s.innerHTML = html;
+}
+
+async function build() {
+  $("build").disabled = true;
+  setStatus('<div class="spinner"></div> Building in Blender…');
+  let res;
+  try { res = await api("/api/build", { config: configPayload() }); }
+  catch (e) { res = { ok: false, errors: [`server unreachable: ${e.message}`] }; }
+  $("build").disabled = false;
+  $("log").textContent = res.log || "";
+  $("log-wrap").classList.toggle("hidden", !res.log);
+  if (!res.ok) {
+    setStatus("Build failed.", "fail");
+    showErrors(res.errors?.length ? res.errors : ["see build log"]);
+    return;
+  }
+  showErrors([]);
+  const size = (res.log.match(/size: ([^\n(]+)/) || [])[1] || "";
+  setStatus(`Built in ${res.seconds} s ${size ? "· " + escapeHtml(size.trim()) : ""}`, "ok");
+  const labels = { full: "Single body STL", base: "Base STL", emblem: "Emblem STL", preview: "Preview PNG" };
+  $("downloads").innerHTML = Object.entries(res.files)
+    .map(([k, url]) => `<a href="${url}" download>${labels[k]}</a>`).join("");
+  $("downloads").classList.remove("hidden");
+  $("preview").src = res.files.preview;
+  $("preview").classList.remove("hidden");
+  showModel(res.files.base, res.files.emblem, state.badge.diameter);
+}
+
+function saveConfig() {
+  const toml = tomlOf(configPayload());
+  const a = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(new Blob([toml], { type: "application/toml" })),
+    download: `${state.badge.name || "badge"}.toml` });
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function tomlOf(sections) {
+  // JSON string escapes are valid TOML; numbers and booleans print the same in both.
+  const v = x => typeof x === "string" ? JSON.stringify(x)
+    : Array.isArray(x) ? `[${x.map(v).join(", ")}]` : String(x);
+  return Object.entries(sections).map(([name, t]) =>
+    `[${name}]\n` + Object.entries(t).map(([k, x]) => `${k} = ${v(x)}`).join("\n")).join("\n\n") + "\n";
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+// ---- 3D viewer (three.js from CDN; the PNG preview still works offline) ----
+let viewer = null;
+async function initViewer() {
+  try {
+    const THREE = await import("three");
+    const { STLLoader } = await import("three/addons/loaders/STLLoader.js");
+    const { OrbitControls } = await import("three/addons/controls/OrbitControls.js");
+    const el = $("viewer");
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    const scene = new THREE.Scene();
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x444450, 1.6));
+    const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+    sun.position.set(1, 2, 1.5);
+    scene.add(sun);
+    const camera = new THREE.PerspectiveCamera(35, 4 / 3, 0.1, 10000);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    const group = new THREE.Group();
+    group.rotation.x = -Math.PI / 2;  // STL is Z-up, three.js is Y-up
+    scene.add(group);
+    const resize = () => {
+      const w = el.clientWidth, h = el.clientHeight;
+      renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+    };
+    new ResizeObserver(resize).observe(el);
+    renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+    viewer = { THREE, loader: new STLLoader(), renderer, scene, camera, controls, group, el };
+  } catch (e) {
+    console.warn("3D viewer unavailable (offline?)", e);
+  }
+}
+
+async function showModel(baseUrl, emblemUrl, diameter) {
+  if (!viewer) return;
+  const { THREE, loader, camera, controls, group, el, renderer } = viewer;
+  const parts = await Promise.all([
+    [baseUrl, 0xb9bec6, 0.35, 0.45], [emblemUrl, 0xd9a53a, 0.6, 0.3],
+  ].map(async ([url, color, metalness, roughness]) => new THREE.Mesh(
+    await loader.loadAsync(url), new THREE.MeshStandardMaterial({ color, metalness, roughness }))));
+  group.clear();
+  parts.forEach(m => group.add(m));
+  if (!renderer.domElement.isConnected) { el.innerHTML = ""; el.appendChild(renderer.domElement); }
+  const d = diameter || 75;
+  camera.position.set(0, d * 1.15, d * 1.5);
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
+
+// ---- Boot ------------------------------------------------------------------
+async function loadPreset(name) {
+  state = structuredClone(presets[name]);
+  renderForm();
+  scheduleValidate();
+}
+
+const data = await api("/api/presets");
+presets = data.presets;
+for (const name of Object.keys(presets)) $("preset").add(new Option(name, name));
+$("preset").value = presets.rear ? "rear" : "defaults";
+$("preset").addEventListener("change", e => loadPreset(e.target.value));
+$("build").addEventListener("click", build);
+$("save").addEventListener("click", saveConfig);
+if (!data.blender) setStatus("Blender was not found. Install it or put <code>blender</code> on PATH, then restart the server.", "fail");
+await loadPreset($("preset").value);
+initViewer();
+</script>
+</body>
+</html>
