@@ -27,6 +27,7 @@ from .mesh import extrude_flat, to_object
 log = logging.getLogger("badge")
 
 CURVE_RESOLUTION = 24  # bezier subdivisions per segment
+PINCH_GAP = 0.01  # mm each side; separates shapes that touch at a single point
 
 
 class EmblemError(RuntimeError):
@@ -40,6 +41,7 @@ def build_emblem(cfg: BadgeConfig, collection: bpy.types.Collection) -> bpy.type
         curve = _make_text(cfg, collection)
     bm = _tessellate(curve)
     _fit(bm, cfg)
+    _separate_pinches(bm)
     extrude_flat(bm, cfg.badge.base_thickness - OVERLAP,
                  base.field_peak(cfg) + cfg.emblem.relief)
     return to_object(bm, f"{cfg.badge.name}_emblem", collection)
@@ -157,6 +159,25 @@ def _tessellate(curve_obj: bpy.types.Object) -> bmesh.types.BMesh:
     for v in bm.verts:
         v.co.z = 0.0
     return bm
+
+
+def _separate_pinches(bm: bmesh.types.BMesh) -> None:
+    """Split vertices where two filled regions touch at a single point.
+
+    Such a pinch (e.g. two glyph corners meeting) extrudes into an edge shared
+    by four faces, which is non-manifold. Each copy is pulled PINCH_GAP into
+    its own region, far below print resolution.
+    """
+    pinches = [v for v in bm.verts
+               if sum(1 for e in v.link_edges if len(e.link_faces) == 1) > 2]
+    for vert in pinches:
+        boundary = [e for e in vert.link_edges if len(e.link_faces) == 1]
+        for copy in bmesh.utils.vert_separate(vert, boundary):
+            inward = sum((f.calc_center_median() - copy.co for f in copy.link_faces), Vector())
+            if inward.length > 0:
+                copy.co += inward.normalized() * PINCH_GAP
+    if pinches:
+        log.debug("separated %d pinch point(s) in the emblem outline", len(pinches))
 
 
 def _fit(bm: bmesh.types.BMesh, cfg: BadgeConfig) -> None:

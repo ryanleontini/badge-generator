@@ -153,6 +153,21 @@ class GeometryTests(unittest.TestCase):
         self.assertEqual(genus(custom.emblem), 3)  # A: 1 counter, 8: 2 counters
         self.assertNotAlmostEqual(info.volume, default_volume, delta=1.0)
 
+    def test_shapes_touching_at_a_point(self):
+        # Regression: glyphs/shapes meeting at one corner used to extrude into a
+        # non-manifold edge. "VW" over "TDI" touches in the built-in font.
+        _, build = self.text("VW\nTDI")
+        self.assertPrintable(build.outputs["full"])
+        self.assertPrintable(build.outputs["emblem"])
+        corner = self.out / "corner.svg"
+        corner.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">'
+                          '<rect x="0" y="0" width="10" height="10"/>'
+                          '<rect x="10" y="10" width="10" height="10"/></svg>')
+        _, build = self.build(emblem={"mode": "svg", "svg_path": str(corner)},
+                              mounting={"style": "none"})
+        self.assertPrintable(build.outputs["full"])
+        self.assertEqual(islands(build.emblem), 2)
+
     def test_multiline_text(self):
         cfg, build = self.text("R\nB")
         self.assertPrintable(build.outputs["emblem"])
