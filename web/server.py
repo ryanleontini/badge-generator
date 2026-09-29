@@ -9,6 +9,7 @@ binds to localhost so nothing is exposed to the network.
 
 import argparse
 import base64
+import errno
 import importlib
 import json
 import re
@@ -223,7 +224,14 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
     args = parser.parse_args()
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    except OSError as exc:
+        if exc.errno != errno.EADDRINUSE:
+            raise
+        sys.exit(f"Port {args.port} is already in use; the UI may already be running at "
+                 f"http://127.0.0.1:{args.port}.\nStop it (Ctrl+C in its terminal, or "
+                 f"`lsof -ti :{args.port} | xargs kill`) or pick another port with --port.")
     url = f"http://127.0.0.1:{args.port}"
     print(f"Badge generator UI at {url}  (Ctrl+C to stop)")
     print(f"Blender: {find_blender() or 'NOT FOUND'}")
