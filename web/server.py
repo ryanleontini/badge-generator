@@ -9,6 +9,7 @@ binds to localhost so nothing is exposed to the network.
 
 import argparse
 import base64
+import importlib
 import json
 import re
 import shutil
@@ -37,6 +38,7 @@ MAC_BLENDER = Path("/Applications/Blender.app/Contents/MacOS/Blender")
 OUTPUT_KINDS = ("full", "base", "emblem", "preview")
 
 _build_lock = threading.Lock()  # one Blender run at a time
+_reload_lock = threading.Lock()
 
 
 def find_blender() -> str | None:
@@ -141,10 +143,22 @@ def build(sections: dict) -> dict:
     }
 
 
+def _reload_config() -> None:
+    """Pick up edits to badge/config.py without restarting the server.
+
+    Builds always run fresh in Blender; this keeps presets and live validation
+    in step with them (the module is pure Python and reloads in ~1 ms).
+    """
+    global config
+    with _reload_lock:
+        config = importlib.reload(config)
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "BadgeGenerator"
 
     def do_GET(self):
+        _reload_config()
         path = unquote(urlparse(self.path).path)
         if path in ("/", "/index.html"):
             self._send_file(WEB / "index.html", "text/html; charset=utf-8")
@@ -160,6 +174,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(HTTPStatus.NOT_FOUND)
 
     def do_POST(self):
+        _reload_config()
         length = int(self.headers.get("Content-Length", 0))
         if length > MAX_UPLOAD * 2:
             return self.send_error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
