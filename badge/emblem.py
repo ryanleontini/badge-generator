@@ -13,6 +13,7 @@ Both modes produce flat filled curves that go through the same steps:
 
 import logging
 import math
+import random
 from pathlib import Path
 
 import addon_utils
@@ -344,15 +345,73 @@ def _separate_pinches(bm: bmesh.types.BMesh) -> None:
 
 
 def _fit(bm: bmesh.types.BMesh, cfg: BadgeConfig) -> None:
-    xs = [v.co.x for v in bm.verts]
-    ys = [v.co.y for v in bm.verts]
-    center = Vector(((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, 0.0))
-    extent = max((v.co - center).length for v in bm.verts)
+    """Center on the smallest enclosing circle and scale it to cfg.emblem_max_radius.
+
+    The enclosing circle (unlike the bounding box) lets lopsided art grow until
+    it touches the limit at two or three points, and rotation can't push it out.
+    """
+    (cx, cy), extent = enclosing_circle(_convex_hull([(v.co.x, v.co.y) for v in bm.verts]))
     if extent <= 0:
         raise EmblemError("emblem has zero size")
     em = cfg.emblem
     matrix = (Matrix.Translation((em.offset_x, em.offset_y, 0.0))
               @ Matrix.Rotation(math.radians(em.rotation_deg), 4, "Z")
               @ Matrix.Scale(cfg.emblem_max_radius / extent, 4)
-              @ Matrix.Translation(-center))
+              @ Matrix.Translation((-cx, -cy, 0.0)))
     bm.transform(matrix)
+
+
+def _convex_hull(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Andrew's monotone chain; the enclosing circle only depends on hull points."""
+    pts = sorted(set(points))
+    if len(pts) <= 2:
+        return pts
+
+    def half(seq):
+        out = []
+        for p in seq:
+            while len(out) >= 2 and ((out[-1][0] - out[-2][0]) * (p[1] - out[-2][1])
+                                     - (out[-1][1] - out[-2][1]) * (p[0] - out[-2][0])) <= 0:
+                out.pop()
+            out.append(p)
+        return out[:-1]
+
+    return half(pts) + half(reversed(pts))
+
+
+def enclosing_circle(points: list[tuple[float, float]]) -> tuple[tuple[float, float], float]:
+    """Smallest circle containing all points (Welzl, iterative; deterministic shuffle)."""
+    pts = list(points)
+    random.Random(0).shuffle(pts)
+    eps = 1e-9
+
+    def inside(c, p):
+        return math.dist(c[0], p) <= c[1] + eps
+
+    def from2(a, b):
+        center = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+        return center, math.dist(a, b) / 2
+
+    def from3(a, b, c):
+        d = 2 * (a[0] * (b[1] - c[1]) + b[0] * (c[1] - a[1]) + c[0] * (a[1] - b[1]))
+        if abs(d) < eps:  # collinear: widest pair
+            return max((from2(a, b), from2(a, c), from2(b, c)), key=lambda k: k[1])
+        ux = ((a[0] ** 2 + a[1] ** 2) * (b[1] - c[1]) + (b[0] ** 2 + b[1] ** 2) * (c[1] - a[1])
+              + (c[0] ** 2 + c[1] ** 2) * (a[1] - b[1])) / d
+        uy = ((a[0] ** 2 + a[1] ** 2) * (c[0] - b[0]) + (b[0] ** 2 + b[1] ** 2) * (a[0] - c[0])
+              + (c[0] ** 2 + c[1] ** 2) * (b[0] - a[0])) / d
+        return (ux, uy), math.dist((ux, uy), a)
+
+    circle = (pts[0], 0.0)
+    for i, p in enumerate(pts):
+        if inside(circle, p):
+            continue
+        circle = (p, 0.0)
+        for j, q in enumerate(pts[:i]):
+            if inside(circle, q):
+                continue
+            circle = from2(p, q)
+            for r in pts[:j]:
+                if not inside(circle, r):
+                    circle = from3(p, q, r)
+    return circle

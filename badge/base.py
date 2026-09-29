@@ -18,11 +18,17 @@ DOME_STEPS = 32  # profile samples across a domed field
 
 
 def build_base(cfg: BadgeConfig, collection: bpy.types.Collection,
-               bottom: Profile | None = None) -> bpy.types.Object:
-    """Build the base + ring body. ``bottom`` overrides the flat bottom profile
-    (used for the tape recess); it must run from (0, z) out to (radius, 0)."""
-    profile = (bottom or [(0.0, 0.0), (cfg.radius, 0.0)]) + _top_profile(cfg)
-    return to_object(revolve(profile, cfg.badge.segments), f"{cfg.badge.name}_base", collection)
+               bottom: Profile | None = None, with_ring: bool = True,
+               name: str | None = None) -> bpy.types.Object:
+    """Build the base body, including the ring unless ``with_ring`` is False.
+
+    ``bottom`` overrides the flat bottom profile (used for the tape recess); it
+    must run from (0, z) out to (radius, 0). Without the ring, the top stays at
+    base_thickness out to the edge, where ring.build_ring's solid sits.
+    """
+    profile = (bottom or [(0.0, 0.0), (cfg.radius, 0.0)]) + _top_profile(cfg, with_ring)
+    return to_object(revolve(profile, cfg.badge.segments),
+                     name or f"{cfg.badge.name}_base", collection)
 
 
 def field_height(cfg: BadgeConfig, r: float) -> float:
@@ -42,15 +48,14 @@ def _field_radius(cfg: BadgeConfig) -> float:
     return cfg.ring_inner_radius if cfg.ring.enabled else cfg.radius
 
 
-def _top_profile(cfg: BadgeConfig) -> Profile:
+def _top_profile(cfg: BadgeConfig, with_ring: bool) -> Profile:
     b = cfg.badge
-    radius, rim = cfg.radius, cfg.rim_height
-    if b.edge_style == "chamfer":
-        shoulder = [(radius, rim - b.edge_size), (radius - b.edge_size, rim)]
+    if cfg.ring.enabled and with_ring:
+        shoulder = ring.outer_shoulder(cfg) + ring.ring_inner_profile(cfg)
+    elif cfg.ring.enabled:  # ring built separately: flat top under it
+        shoulder = [(cfg.radius, b.base_thickness), (cfg.ring_inner_radius, b.base_thickness)]
     else:
-        shoulder = [(radius, rim)]
-    if cfg.ring.enabled:
-        shoulder += ring.ring_inner_profile(cfg)
+        shoulder = ring.outer_shoulder(cfg)
     if b.edge_style == "dome":
         extent = _field_radius(cfg)
         field = [(extent * (1 - k / DOME_STEPS), 0.0) for k in range(1, DOME_STEPS + 1)]

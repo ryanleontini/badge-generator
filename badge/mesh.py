@@ -8,15 +8,20 @@ import bpy
 Profile = list[tuple[float, float]]  # (radius, z) points
 
 
-def revolve(profile: Profile, segments: int) -> bmesh.types.BMesh:
+def revolve(profile: Profile, segments: int, closed: bool = False) -> bmesh.types.BMesh:
     """Spin an (r, z) profile around the Z axis into a closed solid.
 
-    The profile must start on the axis at the bottom, run outward and up, and
-    end on the axis at the top. Points with r == 0 become single pole vertices,
-    so the result is manifold by construction.
+    Open profiles must start on the axis at the bottom, run outward and up, and
+    end on the axis at the top; points with r == 0 become single pole vertices.
+    ``closed`` profiles are loops that never touch the axis (e.g. a ring
+    cross-section) and are joined last-to-first. Either way the result is
+    manifold by construction.
     """
     profile = _dedupe(profile)
-    if profile[0][0] != 0 or profile[-1][0] != 0:
+    if closed:
+        if any(r <= 0 for r, _ in profile):
+            raise ValueError("closed revolve profiles must stay off the axis (r > 0)")
+    elif profile[0][0] != 0 or profile[-1][0] != 0:
         raise ValueError("revolve profile must start and end on the axis (r == 0)")
     bm = bmesh.new()
     angles = [2 * math.pi * i / segments for i in range(segments)]
@@ -26,7 +31,7 @@ def revolve(profile: Profile, segments: int) -> bmesh.types.BMesh:
             rings.append([bm.verts.new((0.0, 0.0, z))])
         else:
             rings.append([bm.verts.new((r * math.cos(a), r * math.sin(a), z)) for a in angles])
-    for lo, hi in zip(rings, rings[1:]):
+    for lo, hi in zip(rings, rings[1:] + (rings[:1] if closed else [])):
         for i in range(segments):
             j = (i + 1) % segments
             if len(lo) == 1:

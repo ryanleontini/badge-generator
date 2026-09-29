@@ -122,6 +122,7 @@ out_dir = "out"
 - Decided: the ring is flush with the disc's outer edge (matches OEM: flat back, no lip wrapping the edge, ring at the rim). The edge chamfer/dome runs from the outer wall up to the ring top as one continuous bevel, so there is no overhang or gap under the ring.
 - When the ring is enabled, build base + ring as ONE lathe/spin of a 2D profile: flat bottom -> outer wall -> edge chamfer -> ring top -> inner bevel -> base top face -> axis. Manifold by construction, no base/ring boolean. Inner radius = disc radius minus width.
 - When the ring is disabled, the edge treatment sits on the base's top outer edge as in step 2.
+- `ring.part = "emblem"`: the ring prints with the emblem (e.g. chrome ring + logo on a body-color disc). The full body is unchanged; the split base is the disc without the ring, and the split emblem is (emblem - ring-less base) UNION a standalone ring solid (`ring.build_ring`, closed-profile revolve). Requires chamfer size < ring height.
 
 ### 4. Emblem (`emblem.py`)
 SVG mode:
@@ -129,7 +130,7 @@ SVG mode:
 - Record existing objects, run `bpy.ops.import_curve.svg(filepath=...)`, diff to find new curve objects.
 - Join all imported curves into one curve object.
 - Set `curve.dimensions = '2D'`, `fill_mode = 'BOTH'` so holes (counters) are respected.
-- Tessellate the filled curve to a flat mesh (via depsgraph), then normalize: center the bounding box at the origin and uniformly scale so the farthest vertex lies on a circle of radius `ring_inner_radius - margin - |offset|` (bounding circle, not box, so rotation can never hit the ring). SVG import units are unreliable (DPI assumptions), so never trust raw scale.
+- Tessellate the filled curve to a flat mesh (via depsgraph), then normalize: center the smallest enclosing circle (Welzl on the convex hull) at the origin and uniformly scale it to radius `ring_inner_radius - margin - |offset|` (so rotation can never hit the ring). `margin = 0` means touching: the emblem reaches `RING_FUSE` (0.3 mm) into the ring so they fuse; otherwise margin must be >= 0.2 mm. SVG import units are unreliable (DPI assumptions), so never trust raw scale.
 - Apply rotation and offsets.
 - Extrude with bmesh from 0.05 mm below the base top face to `relief` above the field's highest point.
 

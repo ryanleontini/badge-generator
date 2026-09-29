@@ -86,6 +86,22 @@ class ConfigTests(unittest.TestCase):
     def test_chamfer_and_bevel_must_leave_ring_top(self):
         self.assertError({"badge": {"edge_size": 3.8}}, "flat ring top")
 
+    def test_margin_is_touch_or_printable_gap(self):
+        self.assertEqual(errors_for({"emblem": {"margin": 0.0}}), [])
+        self.assertError({"emblem": {"margin": 0.1}}, "printable gap")
+        self.assertError({"emblem": {"margin": -1.0}}, "printable gap")
+
+    def test_touching_emblem_fuses_into_ring(self):
+        from badge.config import RING_FUSE
+        cfg = from_dict({"emblem": {"margin": 0.0}}, ROOT)
+        self.assertAlmostEqual(cfg.emblem_max_radius, cfg.ring_inner_radius + RING_FUSE)
+
+    def test_ring_part(self):
+        self.assertEqual(errors_for({"ring": {"part": "emblem"}}), [])
+        self.assertError({"ring": {"part": "logo"}}, "ring.part must be one of")
+        self.assertError({"ring": {"part": "emblem", "height": 0.5}, "badge": {"edge_size": 0.8}},
+                         "chamfer stays on the ring")
+
     def test_all_errors_reported_together(self):
         errors = errors_for({"badge": {"diameter": -1.0}, "emblem": {"relief": 0.0}})
         self.assertGreaterEqual(len(errors), 2)

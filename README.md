@@ -6,7 +6,7 @@ I built it to replace the front grille and rear tailgate emblems on a 2012 VW Je
 
 ![Front config preview: top view and 3/4 view](docs/images/front_preview.png)
 
-| Ring-with-hole emblem (rear config) | Text monogram on a domed field |
+| Ring printed with the emblem, logo touching it (rear config) | Text monogram on a domed field |
 |---|---|
 | ![Rear preview](docs/images/rear_preview.png) | ![Text preview](docs/images/example_text_preview.png) |
 
@@ -108,6 +108,7 @@ All dimensions are in millimeters. Keys you leave out use the defaults below, wh
 | `width` | `4.0` | Radial width |
 | `height` | `1.2` | Height above the base top face |
 | `inner_bevel` | `0.4` | 45° bevel on the ring's inner top edge |
+| `part` | `"base"` | Which printed part the ring belongs to. `"emblem"` prints it with the logo, e.g. a chrome ring and logo on a body-color disc. |
 
 ### `[emblem]`
 
@@ -118,7 +119,7 @@ All dimensions are in millimeters. Keys you leave out use the defaults below, wh
 | `text` | `"RB"` | Text for text mode. `\n` starts a new line. |
 | `font_path` | `""` | TTF/OTF/WOFF2 font. Empty means Blender's built-in font. |
 | `relief` | `1.2` | Height above the base's highest top-face point |
-| `margin` | `3.0` | Minimum gap between the emblem and the ring's inner edge |
+| `margin` | `3.0` | Gap between the emblem and the ring. `0` grows the emblem until it touches the ring, fusing 0.3 mm into it. Otherwise at least 0.2 mm, so the gap actually prints. |
 | `rotation_deg` | `0.0` | Counter-clockwise rotation, viewed from the front |
 | `offset_x`, `offset_y` | `0.0` | Shift from center. Validation checks the emblem still fits. |
 
@@ -159,7 +160,8 @@ web/           local web UI: server.py (stdlib) + index.html
 Design decisions:
 
 - **The base is revolved from one profile.** The disc, edge treatment, ring and tape recess form a single cross-section: flat back, outer wall, chamfer, ring top, inner bevel, top face. Spinning that around the center gives a body that is manifold by construction and needs no booleans. The ring sits flush with the outer edge like the OEM badge, so there's no overhang or trapped gap under it.
-- **The emblem is fitted to a circle, not a box.** The emblem is centered on its bounding box, then scaled so its farthest point lands on the allowed circle. Fitting the bounding box would let a square emblem's corners hit the ring when rotated; fitting the circle keeps it clear at any angle. SVG units and DPI are ignored entirely.
+- **The emblem is fitted by its smallest enclosing circle.** That circle, computed with Welzl's algorithm on the convex hull, is scaled to the allowed radius. Lopsided art grows until it touches the limit at two or three points, and rotation can never push it into the ring. SVG units and DPI are ignored entirely.
+- **Touching means fused.** With `margin = 0` the emblem sinks 0.3 mm into the ring. Parts that meet along a zero-width seam print as separate pieces and confuse boolean solvers, so the emblem and ring become one solid instead.
 - **Holes come from merging all paths into one curve.** All SVG paths are joined into one 2D curve before filling, which is what makes inner contours become holes.
 - **Split bodies don't overlap.** For the single body, the emblem sinks 0.05 mm into the base so the union is clean. For the split STLs, the base is subtracted from the emblem, so the two parts touch exactly. Slicers then never see two bodies claiming the same volume.
 - **Booleans are applied through Blender's scene evaluation** (`new_from_object`) rather than `bpy.ops`. This avoids needing an interactive editor context when running headless. The MANIFOLD solver is used when available (Blender 4.5+), otherwise EXACT.
@@ -204,7 +206,6 @@ The target material stack is ASA, then filler primer, paint and 2K clear, mounte
 ## Known limitations
 
 - **Dome with an emblem:** the emblem's top is flat. Relief is measured from the dome's peak, so the emblem looks taller toward the dome's edge.
-- **Emblem fit:** the emblem is centered on its bounding box, not the smallest enclosing circle. Lopsided artwork can end up slightly smaller than the maximum possible.
 - **One emblem color.** Multi-color SVGs become a single emblem body.
 - **Overlapping SVG shapes** must be merged beforehand. The build detects them and stops with an error instead of printing a wrong shape (see [Preparing artwork](#preparing-artwork)).
 - **No minimum-feature-width check.** Details too thin for your nozzle aren't flagged.

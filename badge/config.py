@@ -20,9 +20,12 @@ from typing import Any
 # Geometric constants shared by the geometry modules.
 OVERLAP = 0.05  # how far unioned parts sink into the base for clean booleans
 MIN_EMBLEM_RADIUS = 2.0  # smallest usable emblem area before we call it an error
+RING_FUSE = 0.3  # with margin = 0, how far the emblem sinks into the ring so they fuse
+MIN_GAP = 0.2  # smallest emblem-to-ring gap that still prints as a real gap
 
 EDGE_STYLES = ("flat", "chamfer", "dome")
 EMBLEM_MODES = ("svg", "text")
+RING_PARTS = ("base", "emblem")
 MOUNTING_STYLES = ("tape", "pins", "none")
 NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 
@@ -53,6 +56,7 @@ class RingSection:
     width: float = 4.0
     height: float = 1.2
     inner_bevel: float = 0.4
+    part: str = "base"  # which printed part (and color) the ring belongs to
 
 
 @dataclass
@@ -129,10 +133,19 @@ class BadgeConfig:
         return self.radius
 
     @property
+    def emblem_touches_ring(self) -> bool:
+        return self.ring.enabled and self.emblem.margin == 0
+
+    @property
     def emblem_max_radius(self) -> float:
-        """Radius the emblem's bounding circle is fitted to, about its offset center."""
+        """Radius of the emblem's enclosing circle, about its offset center.
+
+        With margin = 0 the emblem reaches RING_FUSE into the ring so the two fuse
+        into one solid instead of meeting along a zero-width seam.
+        """
         offset = math.hypot(self.emblem.offset_x, self.emblem.offset_y)
-        return self.emblem_area_radius - self.emblem.margin - offset
+        fuse = RING_FUSE if self.emblem_touches_ring else 0.0
+        return self.emblem_area_radius - self.emblem.margin - offset + fuse
 
     @property
     def svg_file(self) -> Path:
@@ -218,6 +231,12 @@ def validate(cfg: BadgeConfig) -> list[str]:
                 f"{b.diameter} mm badge")
         require(0 <= r.inner_bevel < min(r.width, r.height),
                 "ring.inner_bevel must be >= 0 and smaller than ring width and height")
+        require(r.part in RING_PARTS,
+                f"ring.part must be one of {RING_PARTS}, got {r.part!r}")
+        if r.part == "emblem" and b.edge_style == "chamfer":
+            require(b.edge_size < r.height,
+                    f"badge.edge_size ({b.edge_size}) must be < ring.height ({r.height}) when "
+                    f"ring.part = 'emblem', so the chamfer stays on the ring")
         if b.edge_style == "chamfer":
             require(b.edge_size + r.inner_bevel < r.width,
                     f"badge.edge_size + ring.inner_bevel ({b.edge_size + r.inner_bevel:.2f}) "
@@ -227,7 +246,9 @@ def validate(cfg: BadgeConfig) -> list[str]:
     require(em.mode in EMBLEM_MODES,
             f"emblem.mode must be one of {EMBLEM_MODES}, got {em.mode!r}")
     require(em.relief > 0, "emblem.relief must be > 0")
-    require(em.margin >= 0, "emblem.margin must be >= 0")
+    require(em.margin == 0 or em.margin >= MIN_GAP,
+            f"emblem.margin must be 0 (touch the ring) or >= {MIN_GAP} mm (a printable gap), "
+            f"got {em.margin}")
     if em.mode == "svg":
         if not em.svg_path:
             errors.append("emblem.svg_path is required when emblem.mode = 'svg'")

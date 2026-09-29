@@ -15,12 +15,13 @@ enabled = true
 width = 4.0
 height = 1.2
 inner_bevel = 0.4
+part = "emblem"            # ring prints with the emblem (chrome ring + logo, body-color disc)
 
 [emblem]
 mode = "svg"
-svg_path = "tests/fixtures/ring_with_hole.svg"   # TODO: swap for art/rear.svg
+svg_path = "tests/fixtures/multi_path.svg"   # TODO: swap for art/rear.svg
 relief = 1.2
-margin = 3.0
+margin = 0.0                # 0 = emblem grows until it touches (fuses with) the ring
 
 [mounting]
 style = "tape"

@@ -134,6 +134,8 @@ const SCHEMA = [
     num("width", "Width", "mm", { step: 0.1, show: s => s.ring.enabled }),
     num("height", "Height", "mm", { step: 0.1, show: s => s.ring.enabled }),
     num("inner_bevel", "Inner bevel", "mm", { step: 0.1, show: s => s.ring.enabled }),
+    { key: "part", label: "Ring color", type: "select", options: ["base", "emblem"],
+      show: s => s.ring.enabled, help: "emblem = prints with the logo (e.g. chrome ring)" },
   ]},
   { section: "emblem", title: "Emblem", fields: [
     { key: "mode", label: "Source", type: "segmented", options: [["svg", "SVG file"], ["text", "Text"]] },
@@ -144,7 +146,7 @@ const SCHEMA = [
     { key: "font_path", label: "Font file", type: "text", show: s => s.emblem.mode === "text",
       help: "Path to .ttf/.otf; empty = built-in" },
     num("relief", "Relief height", "mm", { step: 0.1 }),
-    num("margin", "Gap to ring", "mm", { step: 0.1 }),
+    num("margin", "Gap to ring", "mm", { step: 0.1, help: "0 = logo touches and fuses with the ring" }),
     num("rotation_deg", "Rotation", "°", { step: 1 }),
     num("offset_x", "Offset X", "mm", { step: 0.5 }),
     num("offset_y", "Offset Y", "mm", { step: 0.5 }),

@@ -127,6 +127,45 @@ class GeometryTests(unittest.TestCase):
         with self.assertRaisesRegex(EmblemError, "closed"):
             self.build(emblem={"mode": "svg", "svg_path": str(path)})
 
+    def test_fit_uses_smallest_enclosing_circle(self):
+        # The smallest enclosing circle touches the shape at points that don't all
+        # fit in one half-circle (otherwise a smaller circle would exist). A
+        # bounding-box-centered fit breaks this for lopsided shapes like the star.
+        for fixture in ("star.svg", "multi_path.svg"):
+            with self.subTest(fixture=fixture):
+                cfg, build = self.svg(fixture)
+                limit = cfg.emblem_max_radius
+                angles = sorted(math.degrees(math.atan2(v.co.y, v.co.x)) % 360
+                                for v in build.emblem.data.vertices
+                                if math.hypot(v.co.x, v.co.y) > limit - 0.01)
+                self.assertGreaterEqual(len(angles), 2)
+                gaps = [b - a for a, b in zip(angles, angles[1:])] + [angles[0] + 360 - angles[-1]]
+                self.assertLessEqual(max(gaps), 180.5)
+
+    def test_margin_zero_fuses_emblem_into_ring(self):
+        from badge.config import RING_FUSE
+        cfg, build = self.svg("star.svg", margin=0.0)
+        self.assertAlmostEqual(build.emblem_extent, cfg.ring_inner_radius + RING_FUSE, delta=1e-3)
+        for label in ("full", "base", "emblem"):
+            self.assertPrintable(build.outputs[label])
+
+    def test_ring_prints_with_emblem(self):
+        for style in ("chamfer", "flat", "dome"):
+            with self.subTest(edge_style=style):
+                cfg, build = self.build(
+                    badge={"edge_style": style}, ring={"part": "emblem"},
+                    emblem={"mode": "svg", "svg_path": str(FIXTURES / "star.svg"), "margin": 0.0},
+                    mounting={"style": "tape"})
+                base, emb, full = (self.assertPrintable(build.outputs[k])
+                                   for k in ("base", "emblem", "full"))
+                self.assertDiameter(emb, cfg.badge.diameter)  # ring is in the emblem part
+                self.assertAlmostEqual(emb.min[2], cfg.badge.base_thickness, delta=1e-4)
+                self.assertEqual(islands(build.emblem), 1)  # star tips fused to the ring
+                self.assertAlmostEqual(base.volume + emb.volume, full.volume,
+                                       delta=full.volume * 1e-3)
+                if style != "dome":
+                    self.assertAlmostEqual(base.max[2], cfg.badge.base_thickness, delta=1e-4)
+
     # --- Milestone 4: text emblems ------------------------------------------
 
     def text(self, text: str, **emblem):
