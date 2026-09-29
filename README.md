@@ -163,15 +163,18 @@ Design decisions:
 - **Holes come from merging all paths into one curve.** All SVG paths are joined into one 2D curve before filling, which is what makes inner contours become holes.
 - **Split bodies don't overlap.** For the single body, the emblem sinks 0.05 mm into the base so the union is clean. For the split STLs, the base is subtracted from the emblem, so the two parts touch exactly. Slicers then never see two bodies claiming the same volume.
 - **Booleans are applied through Blender's scene evaluation** (`new_from_object`) rather than `bpy.ops`. This avoids needing an interactive editor context when running headless. The MANIFOLD solver is used when available (Blender 4.5+), otherwise EXACT.
+- **Booleans are checked by volume.** Solvers can silently drop an operand that isn't perfectly manifold. The build checks that the full body's volume equals base plus emblem, and fails if it doesn't.
 - **Outputs are verified twice.** Blender checks non-manifold edges before export. Then [tests/stl_check.py](tests/stl_check.py) re-reads each binary STL and checks that it is closed, consistently wound and has positive volume.
 
 ## Preparing artwork
 
-- Use **closed, filled paths**. Strokes and open paths are ignored, with a warning. Convert strokes to paths (Inkscape: *Path → Stroke to Path*).
-- Merge overlapping shapes first (Inkscape: *Path → Union*). Separate shapes that touch or partially overlap can fill incorrectly, and the manifold check will then fail the run.
+- Use **closed, filled paths**. Strokes and open paths are ignored, with a warning. Convert strokes to paths (Figma: *Outline stroke*; Inkscape: *Path → Stroke to Path*).
+- **Merge overlapping shapes** into one (Figma: *Union* then *Flatten*; Inkscape: *Path → Union*). The build compares the filled area against what the outlines should enclose, and stops with an error if paths cross.
+- Export only the emblem shape, not a frame or background rectangle. A background becomes a solid square with your art cut out of it.
 - Convert text in the SVG to outlines, or use text mode instead.
 - Colors, gradients and document size don't matter. Only the shape is used.
 - Keep fine details wider than about 0.5 mm at final size so a 0.4 mm nozzle can print them.
+- **Auto-traced art works.** Curves are resampled to roughly 0.1 mm steps at print size, however many segments the tracer produced. Sub-0.05 mm² fill glitches where traced outlines nearly touch are repaired automatically; the log reports how many.
 
 ## Testing
 
@@ -203,7 +206,7 @@ The target material stack is ASA, then filler primer, paint and 2K clear, mounte
 - **Dome with an emblem:** the emblem's top is flat. Relief is measured from the dome's peak, so the emblem looks taller toward the dome's edge.
 - **Emblem fit:** the emblem is centered on its bounding box, not the smallest enclosing circle. Lopsided artwork can end up slightly smaller than the maximum possible.
 - **One emblem color.** Multi-color SVGs become a single emblem body.
-- **Overlapping SVG shapes** must be merged beforehand (see [Preparing artwork](#preparing-artwork)).
+- **Overlapping SVG shapes** must be merged beforehand. The build detects them and stops with an error instead of printing a wrong shape (see [Preparing artwork](#preparing-artwork)).
 - **No minimum-feature-width check.** Details too thin for your nozzle aren't flagged.
 - **Car-specific values are placeholders.** The front config's 130 mm diameter comes from a retailer listing and hasn't been measured. Pin sizes and positions are also unmeasured. Measure with calipers before printing.
 

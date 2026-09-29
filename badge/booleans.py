@@ -7,7 +7,9 @@ import bpy
 
 log = logging.getLogger("badge")
 
-MERGE_DISTANCE = 0.001  # mm
+# Only fuses true duplicates. Traced SVG art can have real edges ~0.002 mm long;
+# a coarser merge (e.g. 0.001 mm) collapses them and breaks manifoldness.
+MERGE_DISTANCE = 1e-5  # mm
 
 
 def solver() -> str:
@@ -36,11 +38,23 @@ def apply_boolean(target: bpy.types.Object, cutter: bpy.types.Object, operation:
 
 
 def cleanup(obj: bpy.types.Object) -> None:
-    """Merge by distance, drop degenerate/loose geometry, recalc normals outward."""
+    """Merge duplicates, drop degenerate/loose geometry, recalc normals outward.
+
+    Merging is skipped if it would add non-manifold edges: on very fine meshes
+    (traced art) it can fuse distinct points that the solver kept apart.
+    """
     bm = bmesh.new()
     bm.from_mesh(obj.data)
-    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=MERGE_DISTANCE)
-    bmesh.ops.dissolve_degenerate(bm, edges=bm.edges[:], dist=MERGE_DISTANCE / 10)
+    before = _count_non_manifold(bm)
+    merged = bm.copy()
+    bmesh.ops.remove_doubles(merged, verts=merged.verts[:], dist=MERGE_DISTANCE)
+    bmesh.ops.dissolve_degenerate(merged, edges=merged.edges[:], dist=MERGE_DISTANCE / 10)
+    if _count_non_manifold(merged) <= before:
+        bm.free()
+        bm = merged
+    else:
+        merged.free()
+        log.debug("%s: skipped merge by distance (would break manifoldness)", obj.name)
     loose_edges = [e for e in bm.edges if not e.link_faces]
     bmesh.ops.delete(bm, geom=loose_edges, context="EDGES")
     loose_verts = [v for v in bm.verts if not v.link_faces]
@@ -51,16 +65,28 @@ def cleanup(obj: bpy.types.Object) -> None:
     obj.data.update()
 
 
+def _count_non_manifold(bm: bmesh.types.BMesh) -> int:
+    return sum(1 for e in bm.edges if not e.is_manifold)
+
+
 def non_manifold_edges(obj: bpy.types.Object) -> int:
     bm = bmesh.new()
     bm.from_mesh(obj.data)
-    count = sum(1 for e in bm.edges if not e.is_manifold)
+    count = _count_non_manifold(bm)
     bm.free()
     return count
 
 
 class NonManifoldError(RuntimeError):
     pass
+
+
+def volume(obj: bpy.types.Object) -> float:
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    vol = bm.calc_volume(signed=True)
+    bm.free()
+    return vol
 
 
 def require_manifold(*objects: bpy.types.Object) -> None:

@@ -35,9 +35,12 @@ def build_geometry(cfg: BadgeConfig) -> Build:
         _delete(pin)
     booleans.cleanup(body)
 
+    # The extruded emblem is manifold by construction; merging by distance here
+    # could re-fuse the pinch points emblem.py deliberately separated.
     raw_emblem = emblem.build_emblem(cfg, collections["Emblem"])
-    booleans.cleanup(raw_emblem)
+    booleans.require_manifold(raw_emblem)  # solvers may silently drop bad operands
     extent = emblem.emblem_extent(raw_emblem)
+    emblem_volume = booleans.volume(raw_emblem)
 
     # Single body: the emblem overlaps the base by OVERLAP so the union is clean.
     full = copy_object(body, f"{cfg.badge.name}_full", collections["Base"])
@@ -48,6 +51,15 @@ def build_geometry(cfg: BadgeConfig) -> Build:
     # which keeps two-color slicing unambiguous.
     booleans.apply_boolean(raw_emblem, body, "DIFFERENCE")
     booleans.cleanup(raw_emblem)
+
+    # Boolean solvers can silently drop an operand. The trimmed emblem keeps all
+    # but the part sunk into the base, and full must equal base + trimmed emblem.
+    base_volume, split_volume = booleans.volume(body), booleans.volume(raw_emblem)
+    if split_volume < 0.5 * emblem_volume:
+        raise booleans.NonManifoldError(
+            f"boolean lost the emblem ({split_volume / emblem_volume:.0%} of its volume survived)")
+    if abs(booleans.volume(full) - base_volume - split_volume) > 0.01 * (base_volume + split_volume):
+        raise booleans.NonManifoldError("boolean union lost geometry: full body volume != base + emblem")
 
     build = Build(base=body, emblem=raw_emblem, full=full, emblem_extent=extent)
     booleans.require_manifold(*build.bodies)

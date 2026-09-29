@@ -168,6 +168,32 @@ class GeometryTests(unittest.TestCase):
         self.assertPrintable(build.outputs["full"])
         self.assertEqual(islands(build.emblem), 2)
 
+    def test_dense_traced_path_is_resampled(self):
+        # Traced art has thousands of tiny bezier segments; a fixed resolution
+        # produced points ~0.001 mm apart that slicers weld into broken meshes.
+        n = 600
+        pts = [(50 + 40 * math.cos(2 * math.pi * i / n), 50 + 40 * math.sin(2 * math.pi * i / n))
+               for i in range(n)]
+        d = f"M {pts[0][0]:.4f} {pts[0][1]:.4f} " + " ".join(
+            f"C {a[0]:.4f} {a[1]:.4f} {b[0]:.4f} {b[1]:.4f} {b[0]:.4f} {b[1]:.4f}"
+            for a, b in zip(pts, pts[1:] + pts[:1])) + " Z"
+        path = self.out / "dense.svg"
+        path.write_text(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+                        f'<path d="{d}"/></svg>')
+        _, build = self.build(emblem={"mode": "svg", "svg_path": str(path)},
+                              mounting={"style": "none"})
+        info = self.assertPrintable(build.outputs["emblem"])
+        self.assertLess(info.triangles, 20000)
+
+    def test_overlapping_paths_fail_clearly(self):
+        from badge.emblem import EmblemError
+        path = self.out / "overlap.svg"
+        path.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 10">'
+                        '<rect x="0" y="0" width="10" height="10"/>'
+                        '<rect x="6" y="2" width="10" height="6"/></svg>')
+        with self.assertRaisesRegex(EmblemError, "overlap"):
+            self.build(emblem={"mode": "svg", "svg_path": str(path)})
+
     def test_multiline_text(self):
         cfg, build = self.text("R\nB")
         self.assertPrintable(build.outputs["emblem"])

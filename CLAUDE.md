@@ -146,7 +146,7 @@ Text mode:
 - Full body = base UNION emblem. Split emblem = emblem DIFFERENCE base, so split parts touch without overlapping.
 - Modifiers are applied via `bpy.data.meshes.new_from_object(evaluated)` rather than `bpy.ops`, avoiding context issues headless.
 - Solver: use `MANIFOLD` if available (Blender 4.5+), otherwise `EXACT`. Detect via enum items on the modifier.
-- Apply modifiers, then cleanup: merge by distance (0.001 mm), recalc normals outward, delete loose geometry.
+- Apply modifiers, then cleanup: merge by distance (1e-5 mm: true duplicates only; 0.001 mm broke fine traced art), recalc normals outward, delete loose geometry.
 - Manifold check: use bmesh to count non-manifold edges; log the result and fail the run (non-zero exit) if any exist.
 
 ### 7. Export (`export.py`)
